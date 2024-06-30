@@ -13,10 +13,11 @@ import org.bukkit.event.server.ServerCommandEvent;
 import org.bukkit.generator.ChunkGenerator;
 import org.bukkit.plugin.PluginManager;
 import org.bukkit.plugin.java.JavaPlugin;
-import org.bukkit.scheduler.BukkitTask;
 import org.eclipse.jdt.annotation.NonNull;
 import org.eclipse.jdt.annotation.Nullable;
 
+import space.arim.morepaperlib.MorePaperLib;
+import space.arim.morepaperlib.scheduling.ScheduledTask;
 import world.bentobox.bentobox.api.configuration.Config;
 import world.bentobox.bentobox.api.events.BentoBoxReadyEvent;
 import world.bentobox.bentobox.api.localization.TextVariables;
@@ -98,9 +99,11 @@ public class BentoBox extends JavaPlugin implements Listener {
 
     private Config<Settings> configObject;
 
-    private BukkitTask blueprintLoadingTask;
+    private ScheduledTask blueprintLoadingTask;
 
     private boolean shutdown;
+
+    private MorePaperLib morePaperLib;
 
     @Override
     public void onEnable(){
@@ -124,6 +127,9 @@ public class BentoBox extends JavaPlugin implements Listener {
         isLoaded = false;
         // Store the current millis time so we can tell how many ms it took for BSB to fully load.
         final long loadStart = System.currentTimeMillis();
+
+        // Load more paper lib
+        morePaperLib = new MorePaperLib(this);
 
         // Save the default config from config.yml
         saveDefaultConfig();
@@ -175,7 +181,7 @@ public class BentoBox extends JavaPlugin implements Listener {
 
         final long loadTime = System.currentTimeMillis() - loadStart;
 
-        Bukkit.getScheduler().runTask(instance, () -> {
+        instance.getMorePaperLib().scheduling().globalRegionalScheduler().run(() -> {
             try {
                 completeSetup(loadTime);
             } catch (Exception e) {
@@ -250,7 +256,7 @@ public class BentoBox extends JavaPlugin implements Listener {
                 "[time]", String.valueOf(loadTime + enableTime));
 
         // Poll for blueprints loading to be finished - async so could be a completely variable time
-        blueprintLoadingTask = Bukkit.getScheduler().runTaskTimer(instance, () -> {
+        blueprintLoadingTask = instance.getMorePaperLib().scheduling().globalRegionalScheduler().runAtFixedRate(() -> {
             if (getBlueprintsManager().isBlueprintsLoaded()) {
                 blueprintLoadingTask.cancel();
                 // Tell all addons that everything is loaded
@@ -262,7 +268,7 @@ public class BentoBox extends JavaPlugin implements Listener {
                 Bukkit.getPluginManager().callEvent(new BentoBoxReadyEvent());
                 instance.log("All blueprints loaded.");
             }
-        }, 0L, 1L);
+        }, instance.getMorePaperLib().scheduling().isUsingFolia() ? 1L : 0L, 1L);
 
         if (getSettings().getDatabaseType().equals(DatabaseSetup.DatabaseType.YAML)) {
             logWarning("*** You're still using YAML database ! ***");
@@ -393,6 +399,13 @@ public class BentoBox extends JavaPlugin implements Listener {
 
     public static BentoBox getInstance() {
         return instance;
+    }
+
+    /**
+     * @return the More Paper Lib
+     */
+    public MorePaperLib getMorePaperLib() {
+        return morePaperLib;
     }
 
     /**

@@ -10,7 +10,6 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 
-import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.World;
@@ -32,12 +31,12 @@ import org.bukkit.inventory.InventoryHolder;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.material.Attachable;
 import org.bukkit.material.Colorable;
-import org.bukkit.scheduler.BukkitTask;
 import org.bukkit.util.BoundingBox;
 import org.bukkit.util.Vector;
 import org.eclipse.jdt.annotation.NonNull;
 import org.eclipse.jdt.annotation.Nullable;
 
+import space.arim.morepaperlib.scheduling.ScheduledTask;
 import world.bentobox.bentobox.BentoBox;
 import world.bentobox.bentobox.api.localization.TextVariables;
 import world.bentobox.bentobox.api.user.User;
@@ -60,7 +59,7 @@ public class BlueprintClipboard {
     private @Nullable Location pos1;
     private @Nullable Location pos2;
     private @Nullable Vector origin;
-    private BukkitTask copyTask;
+    private ScheduledTask copyTask;
     private int count;
     private boolean copying;
     private int index;
@@ -130,13 +129,13 @@ public class BlueprintClipboard {
 
         int speed = plugin.getSettings().getPasteSpeed();
         List<Vector> vectorsToCopy = getVectors(toCopy);
-        Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> copyAsync(world, user, vectorsToCopy, speed, copyAir, copyBiome));
+        plugin.getMorePaperLib().scheduling().asyncScheduler().run(() -> copyAsync(world, user, vectorsToCopy, speed, copyAir, copyBiome));
         return true;
     }
 
     private void copyAsync(World world, User user, List<Vector> vectorsToCopy, int speed, boolean copyAir, boolean copyBiome) {
         copying = false;
-        copyTask = Bukkit.getScheduler().runTaskTimer(plugin, () -> {
+        copyTask = plugin.getMorePaperLib().scheduling().globalRegionalScheduler().runAtFixedRate(() -> {
             if (copying) {
                 return;
             }

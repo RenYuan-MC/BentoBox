@@ -3,9 +3,7 @@ package world.bentobox.bentobox.api.commands;
 import java.util.HashMap;
 import java.util.Map;
 
-import org.bukkit.Bukkit;
-import org.bukkit.scheduler.BukkitTask;
-
+import space.arim.morepaperlib.scheduling.ScheduledTask;
 import world.bentobox.bentobox.api.addons.Addon;
 import world.bentobox.bentobox.api.user.User;
 
@@ -64,7 +62,7 @@ public abstract class ConfirmableCommand extends CompositeCommand {
         if (toBeConfirmed.containsKey(user)) {
             if (toBeConfirmed.get(user).topLabel().equals(getTopLabel()) && toBeConfirmed.get(user).label().equalsIgnoreCase(getLabel())) {
                 toBeConfirmed.get(user).task().cancel();
-                Bukkit.getScheduler().runTask(getPlugin(), toBeConfirmed.get(user).runnable());
+                getPlugin().getMorePaperLib().scheduling().globalRegionalScheduler().run(toBeConfirmed.get(user).runnable());
                 toBeConfirmed.remove(user);
                 return;
             } else {
@@ -79,7 +77,7 @@ public abstract class ConfirmableCommand extends CompositeCommand {
         // Tell user that they need to confirm
         user.sendMessage("commands.confirmation.confirm", "[seconds]", String.valueOf(getSettings().getConfirmationTime()));
         // Set up a cancellation task
-        BukkitTask task = Bukkit.getScheduler().runTaskLater(getPlugin(), () -> {
+        ScheduledTask task = getPlugin().getMorePaperLib().scheduling().globalRegionalScheduler().runDelayed( () -> {
             user.sendMessage("commands.confirmation.request-cancelled");
             toBeConfirmed.remove(user);
         }, getPlugin().getSettings().getConfirmationTime() * 20L);
@@ -102,6 +100,6 @@ public abstract class ConfirmableCommand extends CompositeCommand {
      * Record to hold the data to run once the confirmation is given
      *
      */
-    private record Confirmer (String topLabel, String label, Runnable runnable, BukkitTask task) { }
+    private record Confirmer (String topLabel, String label, Runnable runnable, ScheduledTask task) { }
 
 }

@@ -17,7 +17,6 @@ import java.util.Queue;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import org.bukkit.Bukkit;
 import org.bukkit.Chunk;
 import org.bukkit.ChunkSnapshot;
 import org.bukkit.Location;
@@ -27,11 +26,12 @@ import org.bukkit.block.Block;
 import org.bukkit.block.BlockFace;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
-import org.bukkit.scheduler.BukkitTask;
+
 import org.bukkit.util.BoundingBox;
 import org.bukkit.util.Vector;
 import org.eclipse.jdt.annotation.Nullable;
 
+import space.arim.morepaperlib.scheduling.ScheduledTask;
 import world.bentobox.bentobox.BentoBox;
 import world.bentobox.bentobox.api.user.User;
 import world.bentobox.bentobox.database.objects.Island;
@@ -105,7 +105,7 @@ public class ClosestSafeSpotTeleport
         this.chunksToScanIterator = this.getChunksToScan().iterator();
 
         // Start a recurring task until done or cancelled
-        this.task = Bukkit.getScheduler().runTaskTimer(this.plugin, this::gatherChunks, 0L, CHUNK_LOAD_SPEED);
+        this.task = this.plugin.getMorePaperLib().scheduling().globalRegionalScheduler().runAtFixedRate(this::gatherChunks, this.plugin.getMorePaperLib().scheduling().isUsingFolia() ? 1L : 0L, CHUNK_LOAD_SPEED);
     }
 
 
@@ -292,8 +292,8 @@ public class ClosestSafeSpotTeleport
         }
         else if (this.entity instanceof Player player)
         {
-            // Return to main thread and teleport the player
-            Bukkit.getScheduler().runTask(this.plugin, () -> returnAndTeleport(player));
+            // Return to main thread and teleport the player (region thread in folia)
+            this.plugin.getMorePaperLib().scheduling().entitySpecificScheduler(player).run(() -> returnAndTeleport(player), null);
         }
         // We do not teleport entities if position failed.
         // Fail the completion
@@ -371,7 +371,7 @@ public class ClosestSafeSpotTeleport
     void teleportEntity(final Location location)
     {
         // Return to main thread and teleport the player
-        Bukkit.getScheduler().runTask(this.plugin, () -> this.asyncTeleport(location));
+        this.plugin.getMorePaperLib().scheduling().globalRegionalScheduler().run(() -> this.asyncTeleport(location));
     }
 
 
@@ -385,7 +385,7 @@ public class ClosestSafeSpotTeleport
         {
             if (this.successRunnable != null)
             {
-                Bukkit.getScheduler().runTask(this.plugin, this.successRunnable);
+                this.plugin.getMorePaperLib().scheduling().globalRegionalScheduler().run(this.successRunnable);
             }
 
             this.result.complete(true);
@@ -811,8 +811,8 @@ public class ClosestSafeSpotTeleport
     private Location noPortalPosition;
 
     /**
-     * Bukkit task that processes chunks.
+     * Task that processes chunks.
      */
-    private BukkitTask task;
+    private ScheduledTask task;
 }
 

@@ -3,7 +3,6 @@ package world.bentobox.bentobox.listeners.flags.worldsettings;
 import java.util.LinkedList;
 import java.util.Queue;
 
-import org.bukkit.Bukkit;
 import org.bukkit.Chunk;
 import org.bukkit.Material;
 import org.bukkit.World;
@@ -12,10 +11,10 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.world.ChunkLoadEvent;
 import org.bukkit.generator.ChunkGenerator;
-import org.bukkit.scheduler.BukkitTask;
 import org.eclipse.jdt.annotation.NonNull;
 import org.eclipse.jdt.annotation.Nullable;
 
+import space.arim.morepaperlib.scheduling.ScheduledTask;
 import world.bentobox.bentobox.BentoBox;
 import world.bentobox.bentobox.api.events.BentoBoxReadyEvent;
 import world.bentobox.bentobox.api.flags.FlagListener;
@@ -44,7 +43,7 @@ public class CleanSuperFlatListener extends FlagListener {
      * @since 1.1
      */
     @Nullable
-    private BukkitTask task;
+    private ScheduledTask task;
 
     /**
      * Whether BentoBox is ready or not.
@@ -95,7 +94,7 @@ public class CleanSuperFlatListener extends FlagListener {
         
         if (this.task == null || this.task.isCancelled())
         {
-            this.task = Bukkit.getScheduler().runTaskTimer(this.plugin, () -> this.cleanChunk(world), 0L, 1L);
+            this.task = this.plugin.getMorePaperLib().scheduling().globalRegionalScheduler().runAtFixedRate(() -> this.cleanChunk(world), this.plugin.getMorePaperLib().scheduling().isUsingFolia() ? 1L : 0L, 1L);
         }
     }
 

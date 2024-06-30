@@ -87,7 +87,7 @@ public class JoinLeaveListener implements Listener {
         // island.
         if (plugin.getIslands().locationIsOnIsland(event.getPlayer(), user.getLocation())
                 && Flags.REMOVE_MOBS.isSetForWorld(user.getWorld())) {
-            Bukkit.getScheduler().runTask(plugin, () -> plugin.getIslands().clearArea(user.getLocation()));
+            plugin.getMorePaperLib().scheduling().globalRegionalScheduler().run(() -> plugin.getIslands().clearArea(user.getLocation()));
         }
 
         // Clear inventory if required
@@ -136,9 +136,9 @@ public class JoinLeaveListener implements Listener {
                         };
 
                         if (delay <= 0) {
-                            Bukkit.getScheduler().runTask(plugin, createIsland);
+                            plugin.getMorePaperLib().scheduling().globalRegionalScheduler().run(createIsland);
                         } else {
-                            Bukkit.getScheduler().runTaskLater(plugin, createIsland, delay * 20L);
+                            plugin.getMorePaperLib().scheduling().globalRegionalScheduler().runDelayed(createIsland, delay * 20L);
                         }
                     }
                 });

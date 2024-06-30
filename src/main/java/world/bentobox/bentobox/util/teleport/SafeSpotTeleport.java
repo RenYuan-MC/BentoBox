@@ -7,7 +7,6 @@ import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import org.bukkit.Bukkit;
 import org.bukkit.Chunk;
 import org.bukkit.ChunkSnapshot;
 import org.bukkit.Location;
@@ -17,10 +16,10 @@ import org.bukkit.World.Environment;
 import org.bukkit.block.BlockFace;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
-import org.bukkit.scheduler.BukkitTask;
 import org.bukkit.util.Vector;
 import org.eclipse.jdt.annotation.Nullable;
 
+import space.arim.morepaperlib.scheduling.ScheduledTask;
 import world.bentobox.bentobox.BentoBox;
 import world.bentobox.bentobox.api.user.User;
 import world.bentobox.bentobox.database.objects.Island;
@@ -49,7 +48,7 @@ public class SafeSpotTeleport {
     private final int maxHeight;
     private final World world;
     private final AtomicBoolean checking = new AtomicBoolean();
-    private BukkitTask task;
+    private ScheduledTask task;
     private boolean portal;
     private boolean cancelIfFail;
     // Locations
@@ -87,7 +86,7 @@ public class SafeSpotTeleport {
             } else {
                 // If this is not a portal teleport, then go to the safe location immediately
                 Util.teleportAsync(entity, location).thenRun(() -> {
-                    if (runnable != null) Bukkit.getScheduler().runTask(plugin, runnable);
+                    if (runnable != null) plugin.getMorePaperLib().scheduling().globalRegionalScheduler().run(runnable);
                     result.complete(true);
                 });
                 return;
@@ -97,7 +96,7 @@ public class SafeSpotTeleport {
         chunksToScanIterator = getChunksToScan().iterator();
 
         // Start a recurring task until done or cancelled
-        task = Bukkit.getScheduler().runTaskTimer(plugin, () -> gatherChunks(failureMessage), 0L, SPEED);
+        task = plugin.getMorePaperLib().scheduling().globalRegionalScheduler().runAtFixedRate(() -> gatherChunks(failureMessage), plugin.getMorePaperLib().scheduling().isUsingFolia() ? 1L : 0L, SPEED);
     }
 
     boolean gatherChunks(String failureMessage) {
@@ -143,8 +142,8 @@ public class SafeSpotTeleport {
             // Portals found, teleport to the best spot we found
             teleportEntity(bestSpot);
         } else if (entity instanceof Player player) {
-            // Return to main thread and teleport the player
-            Bukkit.getScheduler().runTask(plugin, () -> {
+            // Return to main thread and teleport the player (region thread in folia)
+            plugin.getMorePaperLib().scheduling().entitySpecificScheduler(player).run(() -> {
                 // Failed, no safe spot
                 if (!failureMessage.isEmpty()) {
                     User.getInstance(entity).notify(failureMessage);
@@ -163,13 +162,13 @@ public class SafeSpotTeleport {
                     }
                 }
                 if (failRunnable != null) {
-                    Bukkit.getScheduler().runTask(plugin, failRunnable);
+                    plugin.getMorePaperLib().scheduling().globalRegionalScheduler().run(failRunnable);
                 }
                 result.complete(false);
-            });
+            },null);
         } else {
             if (failRunnable != null) {
-                Bukkit.getScheduler().runTask(plugin, failRunnable);
+                plugin.getMorePaperLib().scheduling().globalRegionalScheduler().run(failRunnable);
             }
             result.complete(false);
         }
@@ -181,7 +180,7 @@ public class SafeSpotTeleport {
         location.getBlock().getRelative(BlockFace.UP).setType(Material.AIR, false);
         location.getBlock().getRelative(BlockFace.UP).getRelative(BlockFace.UP).setType(m, false);
         Util.teleportAsync(entity, location.clone().add(new Vector(0.5D, 0D, 0.5D))).thenRun(() -> {
-            if (runnable != null) Bukkit.getScheduler().runTask(plugin, runnable);
+            if (runnable != null) plugin.getMorePaperLib().scheduling().globalRegionalScheduler().run(runnable);
             result.complete(true);
         });
     }
@@ -278,13 +277,13 @@ public class SafeSpotTeleport {
     void teleportEntity(final Location loc) {
         task.cancel();
         // Return to main thread and teleport the player
-        Bukkit.getScheduler().runTask(plugin, () -> {
+        plugin.getMorePaperLib().scheduling().globalRegionalScheduler().run(() -> {
             if (!portal && entity instanceof Player && (homeNumber > 0 || !homeName.isEmpty())) {
                 // Set home if so marked
                 plugin.getIslands().setHomeLocation(User.getInstance(entity), loc, homeName);
             }
             Util.teleportAsync(entity, loc).thenRun(() -> {
-                if (runnable != null) Bukkit.getScheduler().runTask(plugin, runnable);
+                if (runnable != null) plugin.getMorePaperLib().scheduling().globalRegionalScheduler().run(runnable);
                 result.complete(true);
             });
         });

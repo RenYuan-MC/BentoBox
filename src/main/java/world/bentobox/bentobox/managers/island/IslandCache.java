@@ -15,7 +15,6 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
-import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.World;
 import org.eclipse.jdt.annotation.NonNull;
@@ -495,7 +494,7 @@ public class IslandCache {
      * @since 1.3.0
      */
     public void resetAllFlags(World world) {
-        Bukkit.getScheduler().runTaskAsynchronously(BentoBox.getInstance(),
+        BentoBox.getInstance().getMorePaperLib().scheduling().asyncScheduler().run(
                 () -> this.getIslands(world).stream().forEach(Island::setFlagsDefaults));
     }
 

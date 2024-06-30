@@ -4,6 +4,7 @@ import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.time.Duration;
 import java.util.Base64;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -14,6 +15,7 @@ import java.util.UUID;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.stream.Collectors;
 
+import io.papermc.paper.util.Tick;
 import org.bukkit.Bukkit;
 import org.bukkit.profile.PlayerProfile;
 import org.eclipse.jdt.annotation.NonNull;
@@ -121,7 +123,7 @@ public class HeadGetter {
      * @since 1.14.1
      */
     private void runPlayerHeadGetter() {
-        Bukkit.getScheduler().runTaskTimerAsynchronously(plugin, () -> {
+        plugin.getMorePaperLib().scheduling().asyncScheduler().runAtFixedRate(() -> {
             synchronized (HeadGetter.names) {
                 int counter = 0;
 
@@ -130,7 +132,7 @@ public class HeadGetter {
                     final String userName = elementEntry.getKey();
 
                     // Hmm, task in task in task. That is a weird structure.
-                    Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
+                    plugin.getMorePaperLib().scheduling().asyncScheduler().run(() -> {
                         // Check if we can get user Id.
                         UUID userId;
 
@@ -178,8 +180,7 @@ public class HeadGetter {
 
                                 if (!plugin.isShutdown()) {
                                     // Do not run task if plugin is shutting down.
-                                    Bukkit.getScheduler().runTaskAsynchronously(this.plugin,
-                                            () -> req.setHead(elementEntry.getValue()));
+                                    plugin.getMorePaperLib().scheduling().asyncScheduler().run(() -> req.setHead(elementEntry.getValue()));
                                 }
                             }
                         }
@@ -188,7 +189,7 @@ public class HeadGetter {
                     counter++;
                 }
             }
-        }, 0, plugin.getSettings().getTicksBetweenCalls());
+        }, Duration.of(0, Tick.tick()), Duration.of(plugin.getSettings().getTicksBetweenCalls(), Tick.tick()));
     }
 
     /**

@@ -20,6 +20,7 @@ import org.bukkit.util.Vector;
 import org.eclipse.jdt.annotation.NonNull;
 import org.eclipse.jdt.annotation.Nullable;
 
+import space.arim.morepaperlib.scheduling.ScheduledTask;
 import world.bentobox.bentobox.BentoBox;
 import world.bentobox.bentobox.api.localization.TextVariables;
 import world.bentobox.bentobox.api.user.User;
@@ -65,7 +66,7 @@ public class BlueprintPaster {
     // The maximum block position (x,y,z)
     private Location pos2;
     private PasteState pasteState;
-    private BukkitTask pastingTask;
+    private ScheduledTask pastingTask;
     private BlueprintClipboard clipboard;
     private CompletableFuture<Void> currentTask = CompletableFuture.completedFuture(null);
 
@@ -162,7 +163,7 @@ public class BlueprintPaster {
         Bits bits = new Bits(blocks, attached, entities,
                 blocks.entrySet().iterator(), attached.entrySet().iterator(), entities.entrySet().iterator(),
                 plugin.getSettings().getPasteSpeed());
-        pastingTask = Bukkit.getScheduler().runTaskTimer(plugin, () -> pasterTask(result, owner, bits, useNMS), 0L, 1L);
+        pastingTask = plugin.getMorePaperLib().scheduling().globalRegionalScheduler().runAtFixedRate(() -> pasterTask(result, owner, bits, useNMS), plugin.getMorePaperLib().scheduling().isUsingFolia() ? 1L : 0L, 1L);
 
         return result;
     }

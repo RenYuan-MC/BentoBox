@@ -91,7 +91,7 @@ public class IslandWorldManager {
                 if (Bukkit.isPrimaryThread()) {
                     runTask(worldManagementHook, world, islandWorld, reg);
                 } else {
-                    Bukkit.getScheduler().runTask(plugin, () -> runTask(worldManagementHook, world, islandWorld, reg));
+                    plugin.getMorePaperLib().scheduling().globalRegionalScheduler().run(() -> runTask(worldManagementHook, world, islandWorld, reg));
                 }
             }
         }
@@ -213,7 +213,7 @@ public class IslandWorldManager {
         plugin.getFlagsManager().getFlags().stream().filter(f -> f.getType().equals(Flag.Type.SETTING))
                 .forEach(f -> settings.getDefaultIslandSettingNames().putIfAbsent(f.getID(), f.getDefaultRank()));
 
-        Bukkit.getScheduler().runTask(plugin, () -> {
+        plugin.getMorePaperLib().scheduling().globalRegionalScheduler().run(() -> {
             // Set world difficulty
             Difficulty diff = settings.getDifficulty();
             if (diff == null) {

@@ -4,8 +4,6 @@ import java.util.LinkedList;
 import java.util.Queue;
 import java.util.concurrent.atomic.AtomicReference;
 
-import org.bukkit.Bukkit;
-
 import world.bentobox.bentobox.BentoBox;
 import world.bentobox.bentobox.database.objects.IslandDeletion;
 import world.bentobox.bentobox.util.DeleteIslandChunks;
@@ -26,7 +24,7 @@ public class IslandChunkDeletionManager implements Runnable {
         this.slowDeletion = plugin.getSettings().isSlowDeletion();
 
         if (slowDeletion) {
-            Bukkit.getScheduler().runTaskTimer(plugin, this, 0L, 20L);
+            plugin.getMorePaperLib().scheduling().globalRegionalScheduler().runAtFixedRate(this, plugin.getMorePaperLib().scheduling().isUsingFolia() ? 1L : 0L, 20L);
         }
     }
 

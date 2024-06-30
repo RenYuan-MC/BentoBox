@@ -31,7 +31,6 @@ import org.bukkit.entity.Player;
 import org.bukkit.entity.PufferFish;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.permissions.PermissionAttachmentInfo;
-import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.util.Vector;
 import org.eclipse.jdt.annotation.NonNull;
 import org.eclipse.jdt.annotation.Nullable;
@@ -1296,7 +1295,7 @@ public class IslandsManager {
 
             toQuarantine.forEach(handler::saveObjectAsync);
             // Check if there are any islands with duplicate islands
-            Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
+            plugin.getMorePaperLib().scheduling().asyncScheduler().run(() -> {
                 Set<UUID> duplicatedUUIDRemovedSet = new HashSet<>();
                 Set<UUID> duplicated = islandCache.getIslands().stream().map(Island::getOwner).filter(Objects::nonNull)
                         .filter(n -> !duplicatedUUIDRemovedSet.add(n)).collect(Collectors.toSet());
@@ -1479,14 +1478,12 @@ public class IslandsManager {
 
         isSaveTaskRunning = true;
         Queue<Island> queue = new LinkedList<>(islandCache.getCachedIslands());
-        new BukkitRunnable() {
-            @Override
-            public void run() {
+        plugin.getMorePaperLib().scheduling().globalRegionalScheduler().runAtFixedRate((task) -> {
                 for (int i = 0; i < plugin.getSettings().getMaxSavedIslandsPerTick(); i++) {
                     Island island = queue.poll();
                     if (island == null) {
                         isSaveTaskRunning = false;
-                        cancel();
+                        task.cancel();
                         return;
                     }
                     if (island.isChanged()) {
@@ -1497,8 +1494,7 @@ public class IslandsManager {
                         }
                     }
                 }
-            }
-        }.runTaskTimer(plugin, 0, 1);
+            }, plugin.getMorePaperLib().scheduling().isUsingFolia() ? 1L : 0L, 1L);
     }
 
     /**

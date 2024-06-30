@@ -1,6 +1,5 @@
 package world.bentobox.bentobox.api.commands.admin.conversations;
 
-import org.bukkit.Bukkit;
 import org.bukkit.conversations.ConversationContext;
 import org.bukkit.conversations.Prompt;
 import org.bukkit.conversations.StringPrompt;
@@ -40,9 +39,9 @@ public class NamePrompt extends StringPrompt {
     @Override
     public Prompt acceptInput(@NonNull ConversationContext context, String input) {
         if (island.renameHome(oldName, input)) {
-            Bukkit.getScheduler().runTask(plugin, () -> user.sendMessage("general.success"));
+            plugin.getMorePaperLib().scheduling().globalRegionalScheduler().run(() -> user.sendMessage("general.success"));
         } else {
-            Bukkit.getScheduler().runTask(plugin, () -> user.sendMessage("commands.island.renamehome.already-exists"));
+            plugin.getMorePaperLib().scheduling().globalRegionalScheduler().run(() -> user.sendMessage("commands.island.renamehome.already-exists"));
         }
         return Prompt.END_OF_CONVERSATION;
     }

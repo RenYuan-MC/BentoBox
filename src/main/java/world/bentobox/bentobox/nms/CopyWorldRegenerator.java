@@ -33,7 +33,6 @@ import org.bukkit.entity.Villager;
 import org.bukkit.generator.ChunkGenerator;
 import org.bukkit.inventory.InventoryHolder;
 import org.bukkit.material.Colorable;
-import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.util.BoundingBox;
 import org.eclipse.jdt.annotation.NonNull;
 import org.eclipse.jdt.annotation.Nullable;
@@ -81,7 +80,7 @@ public abstract class CopyWorldRegenerator implements WorldRegenerator {
 
     public CompletableFuture<Void> regenerateCopy(GameModeAddon gm, IslandDeletion di, World world) {
         CompletableFuture<Void> bigFuture = new CompletableFuture<>();
-        new BukkitRunnable() {
+        plugin.getMorePaperLib().scheduling().regionSpecificScheduler(di.getWorld(),di.getMinXChunk(),di.getMinZChunk()).runAtFixedRate((task) -> new Runnable() {
             private int chunkX = di.getMinXChunk();
             private int chunkZ = di.getMinZChunk();
             CompletableFuture<Void> currentTask = CompletableFuture.completedFuture(null);
@@ -90,7 +89,7 @@ public abstract class CopyWorldRegenerator implements WorldRegenerator {
             public void run() {
                 if (!currentTask.isDone()) return;
                 if (isEnded(chunkX)) {
-                    cancel();
+                    task.cancel();
                     bigFuture.complete(null);
                     return;
                 }
@@ -117,7 +116,7 @@ public abstract class CopyWorldRegenerator implements WorldRegenerator {
             private boolean isEnded(int chunkX) {
                 return chunkX > di.getMaxXChunk();
             }
-        }.runTaskTimer(plugin, 0L, 20L);
+        }.run(), plugin.getMorePaperLib().scheduling().isUsingFolia() ? 1L : 0L, 20L);
         return bigFuture;
     }
 
@@ -310,7 +309,7 @@ public abstract class CopyWorldRegenerator implements WorldRegenerator {
 
     public CompletableFuture<Void> regenerateSimple(GameModeAddon gm, IslandDeletion di, World world) {
         CompletableFuture<Void> bigFuture = new CompletableFuture<>();
-        new BukkitRunnable() {
+        plugin.getMorePaperLib().scheduling().regionSpecificScheduler(di.getWorld(),di.getMinXChunk(),di.getMinZChunk()).runAtFixedRate((task) -> new Runnable() {
             private int chunkX = di.getMinXChunk();
             private int chunkZ = di.getMinZChunk();
             CompletableFuture<Void> currentTask = CompletableFuture.completedFuture(null);
@@ -319,7 +318,7 @@ public abstract class CopyWorldRegenerator implements WorldRegenerator {
             public void run() {
                 if (!currentTask.isDone()) return;
                 if (isEnded(chunkX)) {
-                    cancel();
+                    task.cancel();
                     bigFuture.complete(null);
                     return;
                 }
@@ -343,7 +342,7 @@ public abstract class CopyWorldRegenerator implements WorldRegenerator {
             private boolean isEnded(int chunkX) {
                 return chunkX > di.getMaxXChunk();
             }
-        }.runTaskTimer(plugin, 0L, 20L);
+        }.run(), plugin.getMorePaperLib().scheduling().isUsingFolia() ? 1L : 0L, 20L);
         return bigFuture;
     }
 

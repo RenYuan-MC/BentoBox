@@ -5,7 +5,6 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.WeakHashMap;
 
-import org.bukkit.Bukkit;
 import org.bukkit.Sound;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.Firework;
@@ -198,7 +197,7 @@ public class PVPListener extends FlagListener {
         if (e.getEntity().getShooter() instanceof Player player && getPlugin().getIWM().inWorld(e.getEntity().getWorld())) {
             // Store it and remove it when the effect is gone (Entity ID, UUID of throwing player)
             thrownPotions.put(e.getAreaEffectCloud().getEntityId(), player.getUniqueId());
-            Bukkit.getScheduler().runTaskLater(getPlugin(), () -> thrownPotions.remove(e.getAreaEffectCloud().getEntityId()), e.getAreaEffectCloud().getDuration());
+            getPlugin().getMorePaperLib().scheduling().globalRegionalScheduler().runDelayed(() -> thrownPotions.remove(e.getAreaEffectCloud().getEntityId()), e.getAreaEffectCloud().getDuration());
         }
     }
 

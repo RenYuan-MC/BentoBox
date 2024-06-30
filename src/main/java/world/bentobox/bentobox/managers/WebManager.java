@@ -1,6 +1,7 @@
 package world.bentobox.bentobox.managers;
 
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.HashMap;
@@ -9,6 +10,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
+import io.papermc.paper.util.Tick;
 import org.eclipse.jdt.annotation.NonNull;
 import org.eclipse.jdt.annotation.Nullable;
 
@@ -57,11 +59,11 @@ public class WebManager {
             long connectionInterval = plugin.getSettings().getGithubConnectionInterval() * 20L * 60L;
             if (connectionInterval <= 0) {
                 // If below 0, it means we shouldn't run this as a repeating task.
-                plugin.getServer().getScheduler().runTaskLaterAsynchronously(plugin, this::requestGitHubData, 20L);
+                plugin.getMorePaperLib().scheduling().asyncScheduler().runDelayed(this::requestGitHubData, Duration.of(20L, Tick.tick()));
             } else {
                 // Set connection interval to be at least 60 minutes.
                 connectionInterval = Math.max(connectionInterval, 60 * 20 * 60L);
-                plugin.getServer().getScheduler().runTaskTimerAsynchronously(plugin, this::requestGitHubData, 20L, connectionInterval);
+                plugin.getMorePaperLib().scheduling().asyncScheduler().runAtFixedRate(this::requestGitHubData, Duration.of(20L, Tick.tick()), Duration.of(connectionInterval, Tick.tick()));
             }
         }
     }

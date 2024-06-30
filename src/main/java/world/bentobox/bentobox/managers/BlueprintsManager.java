@@ -24,7 +24,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.jar.JarFile;
 import java.util.stream.Collectors;
 
-import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.Material;
 import org.bukkit.World;
@@ -189,7 +188,7 @@ public class BlueprintsManager {
     public void loadBlueprintBundles(@NonNull GameModeAddon addon) {
         // Set loading flag
         blueprintsLoaded.add(addon);
-        Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
+        plugin.getMorePaperLib().scheduling().asyncScheduler().run(() -> {
             // Load bundles
             blueprintBundles.put(addon, new ArrayList<>());
             if (!loadBundles(addon)) {
@@ -367,7 +366,7 @@ public class BlueprintsManager {
      * @param bb    blueprint bundle to save
      */
     public void saveBlueprintBundle(GameModeAddon addon, BlueprintBundle bb) {
-        Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
+        plugin.getMorePaperLib().scheduling().asyncScheduler().run(() -> {
             File bpf = getBlueprintsFolder(addon);
             if (!bpf.exists()) {
                 bpf.mkdirs();
@@ -483,7 +482,7 @@ public class BlueprintsManager {
             new BlueprintPaster(plugin, bp, addon.getOverWorld(), island).paste(useNMS)
                     .thenAccept(b -> pasteNether(addon, bb, island).thenAccept(
                             b2 ->
-            pasteEnd(addon, bb, island).thenAccept(message -> sendMessage(island)).thenAccept(b3 -> Bukkit.getScheduler().runTask(plugin, task))));
+            pasteEnd(addon, bb, island).thenAccept(message -> sendMessage(island)).thenAccept(b3 -> plugin.getMorePaperLib().scheduling().globalRegionalScheduler().run(task))));
         }
         // Set the bundle name
         island.putMetaData("bundle", new MetaDataValue(name));

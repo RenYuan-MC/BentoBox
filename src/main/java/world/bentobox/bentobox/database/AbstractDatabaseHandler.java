@@ -2,16 +2,17 @@ package world.bentobox.bentobox.database;
 
 import java.beans.IntrospectionException;
 import java.lang.reflect.InvocationTargetException;
+import java.time.Duration;
 import java.util.List;
 import java.util.Queue;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
-import org.bukkit.Bukkit;
-import org.bukkit.scheduler.BukkitTask;
+import io.papermc.paper.util.Tick;
 import org.eclipse.jdt.annotation.NonNull;
 import org.eclipse.jdt.annotation.Nullable;
 
+import space.arim.morepaperlib.scheduling.ScheduledTask;
 import world.bentobox.bentobox.BentoBox;
 import world.bentobox.bentobox.api.addons.Addon;
 
@@ -35,7 +36,7 @@ public abstract class AbstractDatabaseHandler<T> {
     /**
      * Async save task that runs repeatedly
      */
-    private BukkitTask asyncSaveTask;
+    private ScheduledTask asyncSaveTask;
     private boolean inSave;
 
     protected boolean shutdown;
@@ -101,7 +102,7 @@ public abstract class AbstractDatabaseHandler<T> {
         if (!plugin.isEnabled()) return;
         // Run async queue
         processQueue = new ConcurrentLinkedQueue<>();
-        asyncSaveTask = Bukkit.getScheduler().runTaskTimerAsynchronously(plugin, () -> {
+        asyncSaveTask = plugin.getMorePaperLib().scheduling().asyncScheduler().runAtFixedRate(() -> {
             // Check shutdown
             if(shutdown || plugin.isShutdown()) {
                 // Cancel - this will only get called if the plugin is shutdown separately to the server
@@ -114,7 +115,7 @@ public abstract class AbstractDatabaseHandler<T> {
                 }
                 inSave = false;
             }
-        }, 0L, 1L);
+        }, Duration.of(0, Tick.tick()), Duration.of(1L, Tick.tick()));
     }
 
     protected AbstractDatabaseHandler() {}

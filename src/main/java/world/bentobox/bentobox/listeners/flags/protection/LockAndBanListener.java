@@ -1,6 +1,5 @@
 package world.bentobox.bentobox.listeners.flags.protection;
 
-import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.Sound;
 import org.bukkit.entity.Player;
@@ -14,10 +13,12 @@ import org.bukkit.util.Vector;
 import org.eclipse.jdt.annotation.NonNull;
 
 import io.papermc.lib.PaperLib;
+import oshi.jna.platform.linux.LinuxLibc;
 import world.bentobox.bentobox.BentoBox;
 import world.bentobox.bentobox.api.flags.FlagListener;
 import world.bentobox.bentobox.api.user.User;
 import world.bentobox.bentobox.lists.Flags;
+import world.bentobox.bentobox.util.Util;
 
 /**
  * Listener for the lock flag
@@ -68,7 +69,7 @@ public class LockAndBanListener extends FlagListener {
         // Check from - just in case the player is inside the island
         if (!check(e.getPlayer(), e.getFrom()).equals(CheckResult.OPEN)) {
             // Has to be done 1 tick later otherwise it doesn't happen for some reason...
-            Bukkit.getScheduler().runTask(BentoBox.getInstance(), () -> eject(e.getPlayer()));
+            BentoBox.getInstance().getMorePaperLib().scheduling().globalRegionalScheduler().run(() -> eject(e.getPlayer()));
         }
     }
 
@@ -83,7 +84,7 @@ public class LockAndBanListener extends FlagListener {
         e.getVehicle().getPassengers().stream().filter(Player.class::isInstance).map(Player.class::cast).forEach(p -> {
             if (!checkAndNotify(p, e.getTo()).equals(CheckResult.OPEN)) {
                 p.leaveVehicle();
-                p.teleport(e.getFrom());
+                Util.teleportAsync(p,e.getFrom());
                 e.getVehicle().getWorld().playSound(e.getFrom(), Sound.BLOCK_ANVIL_HIT, 1F, 1F);
                 eject(p);
             }

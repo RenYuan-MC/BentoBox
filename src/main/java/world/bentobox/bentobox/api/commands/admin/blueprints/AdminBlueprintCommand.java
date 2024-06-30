@@ -6,10 +6,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
-import org.bukkit.Bukkit;
 import org.bukkit.Color;
 import org.bukkit.Particle;
 
+import space.arim.morepaperlib.scheduling.ScheduledTask;
 import world.bentobox.bentobox.api.commands.CompositeCommand;
 import world.bentobox.bentobox.api.commands.ConfirmableCommand;
 import world.bentobox.bentobox.api.commands.admin.range.AdminRangeDisplayCommand;
@@ -23,7 +23,7 @@ public class AdminBlueprintCommand extends ConfirmableCommand {
     private Map<UUID, BlueprintClipboard> clipboards;
 
     // Map containing selection cuboid display tasks
-    private Map<User, Integer> displayClipboards;
+    private Map<User, ScheduledTask> displayClipboards;
     private static final Particle.DustOptions PARTICLE_DUST_OPTIONS = new Particle.DustOptions(Color.RED, 1.0F);
 
     public AdminBlueprintCommand(CompositeCommand parent) {
@@ -70,7 +70,7 @@ public class AdminBlueprintCommand extends ConfirmableCommand {
     protected void showClipboard(User user)
     {
         this.displayClipboards.computeIfAbsent(user,
-            key -> Bukkit.getScheduler().scheduleSyncRepeatingTask(this.getPlugin(), () ->
+            key -> getPlugin().getMorePaperLib().scheduling().globalRegionalScheduler().runAtFixedRate(() ->
             {
                 if (!key.isPlayer() || !key.getPlayer().isOnline())
                 {
@@ -137,7 +137,7 @@ public class AdminBlueprintCommand extends ConfirmableCommand {
 
     protected void hideClipboard(User user) {
         if (displayClipboards.containsKey(user)) {
-            Bukkit.getScheduler().cancelTask(displayClipboards.get(user));
+            displayClipboards.get(user).cancel();
             displayClipboards.remove(user);
         }
     }

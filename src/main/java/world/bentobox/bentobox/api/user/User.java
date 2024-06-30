@@ -643,7 +643,7 @@ public class User implements MetaDataAble {
      * @param location - the location
      */
     public void teleport(Location location) {
-        player.teleport(location);
+        Util.teleportAsync(player, location);
     }
 
     /**
