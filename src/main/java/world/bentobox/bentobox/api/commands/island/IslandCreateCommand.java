@@ -133,15 +133,16 @@ public class IslandCreateCommand extends CompositeCommand {
     private boolean makeIsland(User user, String name) {
         user.sendMessage("commands.island.create.creating-island");
         try {
-            NewIsland.builder().player(user).addon(getAddon()).reason(Reason.CREATE).name(name).build();
+            NewIsland.builder().player(user).addon(getAddon()).reason(Reason.CREATE).name(name).build().whenComplete((result, throwable) -> {
+                if (getSettings().isResetCooldownOnCreate()) {
+                    getParent().getSubCommand("reset").ifPresent(
+                            resetCommand -> resetCommand.setCooldown(user.getUniqueId(), getSettings().getResetCooldown()));
+                }
+            });
         } catch (IOException e) {
             getPlugin().logError("Could not create island for player. " + e.getMessage());
             user.sendMessage(e.getMessage());
             return false;
-        }
-        if (getSettings().isResetCooldownOnCreate()) {
-            getParent().getSubCommand("reset").ifPresent(
-                    resetCommand -> resetCommand.setCooldown(user.getUniqueId(), getSettings().getResetCooldown()));
         }
         return true;
     }

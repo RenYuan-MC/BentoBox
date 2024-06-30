@@ -5,6 +5,7 @@ import java.util.EnumMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
 
 import org.bukkit.Location;
 import org.bukkit.Material;
@@ -35,7 +36,7 @@ public class DefaultNewIslandLocationStrategy implements NewIslandLocationStrate
     protected final BentoBox plugin = BentoBox.getInstance();
 
     @Override
-    public Location getNextLocation(World world) {
+    public CompletableFuture<Location> getNextLocation(World world) {
         Location last = plugin.getIslands().getLast(world);
         if (last == null) {
             last = new Location(world,
@@ -43,27 +44,39 @@ public class DefaultNewIslandLocationStrategy implements NewIslandLocationStrate
                     plugin.getIWM().getIslandHeight(world),
                     (double) plugin.getIWM().getIslandZOffset(world) + plugin.getIWM().getIslandStartZ(world));
         }
-        // Find a free spot
-        Map<Result, Integer> result = new EnumMap<>(Result.class);
-        // Check center
-        Result r = isIsland(last);
-        while (!r.equals(Result.FREE) && result.getOrDefault(Result.BLOCKS_IN_AREA, 0) < MAX_UNOWNED_ISLANDS) {
-            nextGridLocation(last);
-            result.put(r, result.getOrDefault(r, 0) + 1);
-            r = isIsland(last);
-        }
 
-        if (!r.equals(Result.FREE)) {
-            // We could not find a free spot within the limit required. It's likely this
-            // world is not empty
-            plugin.logError("Could not find a free spot for islands! Is this world empty?");
-            plugin.logError("Blocks around center locations: " + result.getOrDefault(Result.BLOCKS_IN_AREA, 0) + " max "
-                    + MAX_UNOWNED_ISLANDS);
-            plugin.logError("Known islands: " + result.getOrDefault(Result.ISLAND_FOUND, 0) + " max unlimited.");
-            return null;
-        }
-        plugin.getIslands().setLast(last);
-        return last;
+        CompletableFuture<Location> lastFuture = new CompletableFuture<>();
+
+        Location finalLast = last;
+        plugin.getMorePaperLib().scheduling().asyncScheduler().run(() -> {
+            // Find a free spot
+            Map<Result, Integer> result = new EnumMap<>(Result.class);
+            // Check center
+            CompletableFuture<Result> resultFuture = isIsland(finalLast);
+            Result r = resultFuture.join();
+
+            Location newLast = finalLast;
+            while (!r.equals(Result.FREE) && result.getOrDefault(Result.BLOCKS_IN_AREA, 0) < MAX_UNOWNED_ISLANDS) {
+                newLast = nextGridLocation(newLast);
+                result.put(r, result.getOrDefault(r, 0) + 1);
+                r = isIsland(newLast).join();
+            }
+
+            if (!r.equals(Result.FREE)) {
+                // We could not find a free spot within the limit required. It's likely this
+                // world is not empty
+                plugin.logError("Could not find a free spot for islands! Is this world empty?");
+                plugin.logError("Blocks around center locations: " + result.getOrDefault(Result.BLOCKS_IN_AREA, 0) + " max "
+                                + MAX_UNOWNED_ISLANDS);
+                plugin.logError("Known islands: " + result.getOrDefault(Result.ISLAND_FOUND, 0) + " max unlimited.");
+                lastFuture.complete(null);
+                return;
+            }
+            plugin.getIslands().setLast(newLast);
+            lastFuture.complete(newLast);
+        });
+
+        return lastFuture;
     }
 
     /**
@@ -72,9 +85,15 @@ public class DefaultNewIslandLocationStrategy implements NewIslandLocationStrate
      * @param location - the location
      * @return Result enum indicated what was found or not found
      */
-    protected Result isIsland(Location location) {
+    protected CompletableFuture<Result> isIsland(Location location) {
+
+        CompletableFuture<Result> islandResult = new CompletableFuture<>();
+
         // Quick check
-        if (plugin.getIslands().getIslandAt(location).isPresent()) return Result.ISLAND_FOUND;
+        if (plugin.getIslands().getIslandAt(location).isPresent()) {
+            islandResult.complete(Result.ISLAND_FOUND);
+            return islandResult;
+        }
 
         World world = location.getWorld();
 
@@ -88,38 +107,57 @@ public class DefaultNewIslandLocationStrategy implements NewIslandLocationStrate
         locs.add(new Location(world, location.getX() + dist - 1, 0, location.getZ() - dist));
         locs.add(new Location(world, location.getX() + dist - 1, 0, location.getZ() + dist - 1));
 
-        boolean generated = false;
-        for (Location l : locs) {
-            if (plugin.getIslands().getIslandAt(l).isPresent() || plugin.getIslandDeletionManager().inDeletion(l)) {
-                return Result.ISLAND_FOUND;
+        CompletableFuture<Boolean> generatedFuture = new CompletableFuture<>();
+        plugin.getMorePaperLib().scheduling().asyncScheduler().run(() -> {
+            boolean generated = false;
+            for (Location l : locs) {
+                if (plugin.getIslands().getIslandAt(l).isPresent() || plugin.getIslandDeletionManager().inDeletion(l)) {
+                    islandResult.complete(Result.ISLAND_FOUND);
+                    return;
+                }
+                CompletableFuture<Boolean> result = new CompletableFuture<>();
+                plugin.getMorePaperLib().scheduling().regionSpecificScheduler(l).run(() -> {
+                    result.complete(Util.isChunkGenerated(l));
+                });
+                if (result.join()) generated = true;
             }
-            if (Util.isChunkGenerated(l)) generated = true;
-        }
-        // If chunk has not been generated yet, then it's not occupied
-        if (!generated) {
-            return Result.FREE;
-        }
-        // Block check
-        if (plugin.getIWM().isCheckForBlocks(world) 
-                && !plugin.getIWM().isUseOwnGenerator(world) 
-                && Arrays.stream(BlockFace.values()).anyMatch(bf ->
-                !location.getBlock().getRelative(bf).isEmpty() 
-                && !location.getBlock().getRelative(bf).getType().equals(Material.WATER))) {
-            // Block found
-            plugin.getIslands().createIsland(location);
-            return Result.BLOCKS_IN_AREA;
-        }
-        return Result.FREE;
+            generatedFuture.complete(generated);
+        });
+
+        generatedFuture.whenComplete((generated,throwable) -> {
+            // If chunk has not been generated yet, then it's not occupied
+            if (!generated) {
+                islandResult.complete(Result.FREE);
+                return;
+            }
+            plugin.getMorePaperLib().scheduling().regionSpecificScheduler(location).run(() -> {
+                // Block check
+                if (plugin.getIWM().isCheckForBlocks(world)
+                    && !plugin.getIWM().isUseOwnGenerator(world)
+                    && Arrays.stream(BlockFace.values()).anyMatch(bf ->
+                        !location.getBlock().getRelative(bf).isEmpty()
+                        && !location.getBlock().getRelative(bf).getType().equals(Material.WATER))) {
+                    // Block found
+                    plugin.getIslands().createIsland(location);
+                    islandResult.complete(Result.BLOCKS_IN_AREA);
+                    return;
+                }
+                islandResult.complete(Result.FREE);
+            });
+        });
+
+        return islandResult;
     }
 
     /**
      * Finds the next free island spot based off the last known island Uses
      * island_distance setting from the config file Builds up in a grid fashion
      *
-     * @param lastIsland - last island location
+     * @param finalLastIsland - last island location
      * @return Location of next free island
      */
-    private Location nextGridLocation(final Location lastIsland) {
+    private Location nextGridLocation(Location finalLastIsland) {
+        Location lastIsland = finalLastIsland.clone();
         int x = lastIsland.getBlockX();
         int z = lastIsland.getBlockZ();
         int d = plugin.getIWM().getIslandDistance(lastIsland.getWorld()) * 2;

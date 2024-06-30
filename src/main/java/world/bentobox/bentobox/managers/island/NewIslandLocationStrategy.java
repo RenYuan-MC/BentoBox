@@ -3,6 +3,8 @@ package world.bentobox.bentobox.managers.island;
 import org.bukkit.Location;
 import org.bukkit.World;
 
+import java.util.concurrent.CompletableFuture;
+
 /**
  * Determines the locations for new islands
  * @author tastybento, leonardochaia
@@ -10,5 +12,5 @@ import org.bukkit.World;
  *
  */
 public interface NewIslandLocationStrategy {
-    Location getNextLocation(World world);
+    CompletableFuture<Location> getNextLocation(World world);
 }

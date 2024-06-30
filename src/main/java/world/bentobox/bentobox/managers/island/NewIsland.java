@@ -1,6 +1,7 @@
 package world.bentobox.bentobox.managers.island;
 
 import java.io.IOException;
+import java.util.concurrent.CompletableFuture;
 
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
@@ -39,7 +40,7 @@ public class NewIsland {
 
     private NewIslandLocationStrategy locationStrategy;
 
-    public NewIsland(Builder builder) throws IOException {
+    public NewIsland(Builder builder, CompletableFuture<Island> islandFuture){
         plugin = BentoBox.getInstance();
         this.user = builder.user2;
         this.reason = builder.reason2;
@@ -52,6 +53,7 @@ public class NewIsland {
         if (this.locationStrategy == null) {
             this.locationStrategy = new DefaultNewIslandLocationStrategy();
         }
+
         // Fire pre-create event
         IslandBaseEvent event = IslandEvent.builder().involvedPlayer(user.getUniqueId()).reason(Reason.PRECREATE)
                 .build();
@@ -59,7 +61,14 @@ public class NewIsland {
             // Do nothing
             return;
         }
-        newIsland(builder.oldIsland2);
+
+        newIsland(builder.oldIsland2).whenComplete((result,throwable) -> islandFuture.complete(getIsland()));
+    }
+
+    public static CompletableFuture<Island> create(Builder builder) throws IOException {
+        CompletableFuture<Island> futureIsland = new CompletableFuture<>();
+        new NewIsland(builder, futureIsland);
+        return futureIsland;
     }
 
     /**
@@ -155,14 +164,10 @@ public class NewIsland {
         }
 
         /**
-         * @return Island
          * @throws IOException - if there are insufficient parameters, i.e., no user
          */
-        public Island build() throws IOException {
-            if (user2 != null) {
-                NewIsland newIsland = new NewIsland(this);
-                return newIsland.getIsland();
-            }
+        public CompletableFuture<Island> build() throws IOException {
+            if (user2 != null) return NewIsland.create(this);
             throw new IOException("Insufficient parameters. Must have a user!");
         }
     }
@@ -171,54 +176,67 @@ public class NewIsland {
      * Makes an island.
      * 
      * @param oldIsland old island that is being replaced, if any
-     * @throws IOException - if an island cannot be made. Message is the tag to show
-     *                     the user.
+     *
      */
-    public void newIsland(Island oldIsland) throws IOException {
+    public CompletableFuture<Boolean> newIsland(Island oldIsland) {
+
+        CompletableFuture<Boolean> result = new CompletableFuture<>();
+
         // Find the new island location
-        Location next = checkReservedIsland();
-        if (next == null) {
-            next = this.makeNextIsland();
-        }
-        // Clean up the user
-        cleanUpUser(next);
-        // Fire event
-        IslandBaseEvent event = IslandEvent.builder().involvedPlayer(user.getUniqueId()).reason(reason).island(island)
-                .location(island.getCenter())
-                .blueprintBundle(plugin.getBlueprintsManager().getBlueprintBundles(addon).get(name))
-                .oldIsland(oldIsland).build();
-        if (event.getNewEvent().map(IslandBaseEvent::isCancelled).orElse(event.isCancelled())) {
-            // Do nothing
-            return;
-        }
-        event = event.getNewEvent().orElse(event);
-        // Get the new BlueprintBundle if it was changed
-        switch (reason) {
-        case CREATE -> name = ((IslandCreateEvent) event).getBlueprintBundle().getUniqueId();
-        case RESET -> name = ((IslandResetEvent) event).getBlueprintBundle().getUniqueId();
-        default -> {
-            // Do nothing of other cases
-        }
-        }
-        // Set the player's primary island
-        plugin.getIslands().setPrimaryIsland(user.getUniqueId(), island);
-        // Run task to run after creating the island in one tick if island is not being
-        // pasted
-        if (noPaste) {
-            plugin.getMorePaperLib().scheduling().globalRegionalScheduler().run(() -> postCreationTask(oldIsland));
+        CompletableFuture<Location> futureLoc ;
+        Location nextLoc = checkReservedIsland();
+        if (nextLoc == null) {
+            futureLoc = this.makeNextIsland();
         } else {
-            // Find out how far away the player is from the new island
-            boolean useNMS = !user.getWorld().equals(island.getWorld())
-                    || (user.getLocation().distance(island.getCenter()) >= Bukkit.getViewDistance() * 16D);
-            // Create islands, then run task
-            plugin.getBlueprintsManager().paste(addon, island, name, () -> postCreationTask(oldIsland), useNMS);
+            futureLoc = new CompletableFuture<>();
+            futureLoc.complete(nextLoc);
         }
-        // Set default settings
-        island.setFlagsDefaults();
-        // Register metrics
-        plugin.getMetrics().ifPresent(BStats::increaseIslandsCreatedCount);
-        // Save island
-        IslandsManager.updateIsland(island);
+        futureLoc.whenComplete((next,throwable) -> {
+            if (next == null) return;
+            // Clean up the user
+            cleanUpUser(next);
+            // TODO: fix event fire
+            // Fire event
+            // IslandBaseEvent event = IslandEvent.builder().involvedPlayer(user.getUniqueId()).reason(reason).island(island)
+            //         .location(island.getCenter())
+            //         .blueprintBundle(plugin.getBlueprintsManager().getBlueprintBundles(addon).get(name))
+            //         .oldIsland(oldIsland).build();
+            // if (event.getNewEvent().map(IslandBaseEvent::isCancelled).orElse(event.isCancelled())) {
+            //     // Do nothing
+            //     result.complete(true);
+            //     return;
+            // }
+            // event = event.getNewEvent().orElse(event);
+            // // Get the new BlueprintBundle if it was changed
+            // switch (reason) {
+            //     case CREATE -> name = ((IslandCreateEvent) event).getBlueprintBundle().getUniqueId();
+            //     case RESET -> name = ((IslandResetEvent) event).getBlueprintBundle().getUniqueId();
+            //     default -> {
+            //         // Do nothing of other cases
+            //     }
+            // }
+            // Set the player's primary island
+            plugin.getIslands().setPrimaryIsland(user.getUniqueId(), island);
+            // Run task to run after creating the island in one tick if island is not being
+            // pasted
+            if (noPaste) {
+                plugin.getMorePaperLib().scheduling().globalRegionalScheduler().run(() -> postCreationTask(oldIsland));
+            } else {
+                // Find out how far away the player is from the new island
+                boolean useNMS = !user.getWorld().equals(island.getWorld())
+                                 || (user.getLocation().distance(island.getCenter()) >= Bukkit.getViewDistance() * 16D);
+                // Create islands, then run task
+                plugin.getBlueprintsManager().paste(addon, island, name, () -> postCreationTask(oldIsland), useNMS);
+            }
+            // Set default settings
+            island.setFlagsDefaults();
+            // Register metrics
+            plugin.getMetrics().ifPresent(BStats::increaseIslandsCreatedCount);
+            // Save island
+            IslandsManager.updateIsland(island);
+            result.complete(true);
+        });
+        return result;
     }
 
     /**
@@ -273,24 +291,42 @@ public class NewIsland {
      * Get the next island location and add it to the island grid
      * 
      * @return location of new island
-     * @throws IOException - if there are no unoccupied spots or the island could
-     *                     not be added to the grid
+     *
      */
-    private Location makeNextIsland() throws IOException {
+    private CompletableFuture<Location> makeNextIsland() {
+
+        CompletableFuture<Location> result = new CompletableFuture<>();
+
         // If the reservation fails, then we need to make a new island anyway
-        Location next = this.locationStrategy.getNextLocation(world);
-        if (next == null) {
-            plugin.logError("Failed to make island - no unoccupied spot found.");
-            plugin.logError("If the world was imported, try multiple times until all unowned islands are known.");
-            throw new IOException("commands.island.create.cannot-create-island");
-        }
-        // Add to the grid
-        island = plugin.getIslands().createIsland(next, user.getUniqueId());
-        if (island == null) {
-            plugin.logError("Failed to make island! Island could not be added to the grid.");
-            throw new IOException("commands.island.create.unable-create-island");
-        }
-        return next;
+        CompletableFuture<Location> nextLoc = this.locationStrategy.getNextLocation(world);
+
+        nextLoc.whenComplete((next,throwable) -> {
+            if (next == null) {
+                plugin.logError("Failed to make island - no unoccupied spot found.");
+                plugin.logError("If the world was imported, try multiple times until all unowned islands are known.");
+                try {
+                    throw new IOException("commands.island.create.cannot-create-island");
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+                result.complete(null);
+                return;
+            }
+            // Add to the grid
+            island = plugin.getIslands().createIsland(next, user.getUniqueId());
+            if (island == null) {
+                plugin.logError("Failed to make island! Island could not be added to the grid.");
+                try {
+                    throw new IOException("commands.island.create.unable-create-island");
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+                result.complete(null);
+            }
+            result.complete(next);
+        });
+
+        return result;
     }
 
     /**
