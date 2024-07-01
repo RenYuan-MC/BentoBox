@@ -38,6 +38,7 @@ import org.eclipse.jdt.annotation.NonNull;
 import org.eclipse.jdt.annotation.Nullable;
 
 import io.papermc.lib.PaperLib;
+import space.arim.morepaperlib.scheduling.ScheduledTask;
 import world.bentobox.bentobox.BentoBox;
 import world.bentobox.bentobox.api.addons.GameModeAddon;
 import world.bentobox.bentobox.api.hooks.Hook;
@@ -80,7 +81,8 @@ public abstract class CopyWorldRegenerator implements WorldRegenerator {
 
     public CompletableFuture<Void> regenerateCopy(GameModeAddon gm, IslandDeletion di, World world) {
         CompletableFuture<Void> bigFuture = new CompletableFuture<>();
-        plugin.getMorePaperLib().scheduling().regionSpecificScheduler(di.getWorld(),di.getMinXChunk(),di.getMinZChunk()).runAtFixedRate((task) -> new Runnable() {
+
+        var runnable = new Runnable() {
             private int chunkX = di.getMinXChunk();
             private int chunkZ = di.getMinZChunk();
             CompletableFuture<Void> currentTask = CompletableFuture.completedFuture(null);
@@ -88,11 +90,7 @@ public abstract class CopyWorldRegenerator implements WorldRegenerator {
             @Override
             public void run() {
                 if (!currentTask.isDone()) return;
-                if (isEnded(chunkX)) {
-                    task.cancel();
-                    bigFuture.complete(null);
-                    return;
-                }
+
                 List<CompletableFuture<Void>> newTasks = new ArrayList<>();
                 for (int i = 0; i < plugin.getSettings().getDeleteSpeed(); i++) {
                     if (isEnded(chunkX)) {
@@ -116,7 +114,20 @@ public abstract class CopyWorldRegenerator implements WorldRegenerator {
             private boolean isEnded(int chunkX) {
                 return chunkX > di.getMaxXChunk();
             }
-        }.run(), plugin.getMorePaperLib().scheduling().isUsingFolia() ? 1L : 0L, 20L);
+
+            private boolean checkEnded(){
+                return isEnded(chunkX);
+            }
+        };
+
+        plugin.getMorePaperLib().scheduling().regionSpecificScheduler(di.getWorld(),di.getMinXChunk(),di.getMinZChunk()).runAtFixedRate((task) ->{
+            if (runnable.checkEnded()) {
+                task.cancel();
+                bigFuture.complete(null);
+                return;
+            }
+            runnable.run();
+        }, plugin.getMorePaperLib().scheduling().isUsingFolia() ? 1L : 0L, 20L);
         return bigFuture;
     }
 
@@ -309,7 +320,9 @@ public abstract class CopyWorldRegenerator implements WorldRegenerator {
 
     public CompletableFuture<Void> regenerateSimple(GameModeAddon gm, IslandDeletion di, World world) {
         CompletableFuture<Void> bigFuture = new CompletableFuture<>();
-        plugin.getMorePaperLib().scheduling().regionSpecificScheduler(di.getWorld(),di.getMinXChunk(),di.getMinZChunk()).runAtFixedRate((task) -> new Runnable() {
+
+        var runnable = new Runnable() {
+
             private int chunkX = di.getMinXChunk();
             private int chunkZ = di.getMinZChunk();
             CompletableFuture<Void> currentTask = CompletableFuture.completedFuture(null);
@@ -317,11 +330,6 @@ public abstract class CopyWorldRegenerator implements WorldRegenerator {
             @Override
             public void run() {
                 if (!currentTask.isDone()) return;
-                if (isEnded(chunkX)) {
-                    task.cancel();
-                    bigFuture.complete(null);
-                    return;
-                }
                 List<CompletableFuture<Void>> newTasks = new ArrayList<>();
                 for (int i = 0; i < plugin.getSettings().getDeleteSpeed(); i++) {
                     if (isEnded(chunkX)) {
@@ -342,7 +350,21 @@ public abstract class CopyWorldRegenerator implements WorldRegenerator {
             private boolean isEnded(int chunkX) {
                 return chunkX > di.getMaxXChunk();
             }
-        }.run(), plugin.getMorePaperLib().scheduling().isUsingFolia() ? 1L : 0L, 20L);
+
+            private boolean checkEnded(){
+                return isEnded(chunkX);
+            }
+
+        };
+
+        plugin.getMorePaperLib().scheduling().regionSpecificScheduler(di.getWorld(), di.getMinXChunk(), di.getMinZChunk()).runAtFixedRate((task) -> {
+            if (runnable.checkEnded()) {
+                task.cancel();
+                bigFuture.complete(null);
+                return;
+            }
+            runnable.run();
+        }, plugin.getMorePaperLib().scheduling().isUsingFolia() ? 1L : 0L, 20L);
         return bigFuture;
     }
 
